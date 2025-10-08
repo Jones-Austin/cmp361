@@ -7,13 +7,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>Car Brands</h1>
         <?php
+            function toggleSortOrder($currentDirection) {
+                return ($currentDirection === 'asc') ? 'desc' : 'asc';
+            }
+
             $apiUrl = 'http://localhost:8004/api/v1/cars'; 
-            
             $itemsPerPage = 3;
 
-            // Fetch the JSON data from the API
+            
             $json_data = @file_get_contents($apiUrl);
 
             if ($json_data === false) {
@@ -23,41 +25,63 @@
                 $allBrands = json_decode($json_data, true);
 
                 if (is_array($allBrands) && !empty($allBrands)) {
-                    -
+                    
+                    
+                    $sort_column = filter_input(INPUT_GET, 'sort', FILTER_SANITIZE_SPECIAL_CHARS) ?: 'carbrand';
+                    $sort_direction = strtolower(filter_input(INPUT_GET, 'dir', FILTER_SANITIZE_SPECIAL_CHARS) ?: 'asc');
+                    if ($sort_direction !== 'asc' && $sort_direction !== 'desc') {
+                        $sort_direction = 'asc';
+                    }
+
+                    // SORT THE DATA
+                    usort($allBrands, function($a, $b) use ($sort_column, $sort_direction) {
+                        if ($sort_direction === 'asc') {
+                            return strcmp($a[$sort_column], $b[$sort_column]);
+                        } else {
+                            return strcmp($b[$sort_column], $a[$sort_column]);
+                        }
+                    });
+                    
                     $totalBrands = count($allBrands);
                     $totalPages = ceil($totalBrands / $itemsPerPage);
 
-                    $currentPage = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, [
-                        'options' => ['default' => 1, 'min_range' => 1]
-                    ]);
-                    if ($currentPage > $totalPages) {
+                    $currentPage = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+                    if ($currentPage > $totalPages && $totalPages > 0) {
                         $currentPage = $totalPages;
                     }
                     $offset = ($currentPage - 1) * $itemsPerPage;
-
                     $brandsForPage = array_slice($allBrands, $offset, $itemsPerPage);
-                    // loop through and display the brands
+
+                    $sort_url = "?sort={$sort_column}&dir=" . toggleSortOrder($sort_direction);
+                    echo "<h1><a href='{$sort_url}'>Car Brands</a></h1>";
+
+                    // 5. DISPLAY
                     echo '<ul class="brand-list">';
                     foreach ($brandsForPage as $brand) {
                         echo '<li>' . htmlspecialchars($brand['carbrand']) . '</li>';
                     }
                     echo '</ul>';
+                
                     if ($totalPages > 1) {
                         echo '<div class="pagination">';
+                        $sort_params = "&sort={$sort_column}&dir={$sort_direction}";
+
                         if ($currentPage > 1) {
-                            echo '<a href="?page=' . ($currentPage - 1) . '">&laquo; Previous</a>';
+                            echo '<a href="?page=' . ($currentPage - 1) . $sort_params . '">&laquo; Previous</a>';
                         } else {
                             echo '<span class="disabled">&laquo; Previous</span>';
                         }
+                        
                         for ($i = 1; $i <= $totalPages; $i++) {
                             if ($i == $currentPage) {
                                 echo '<span class="current-page">' . $i . '</span>';
                             } else {
-                                echo '<a href="?page=' . $i . '">' . $i . '</a>';
+                                echo '<a href="?page=' . $i . $sort_params . '">' . $i . '</a>';
                             }
                         }
+                        
                         if ($currentPage < $totalPages) {
-                            echo '<a href="?page=' . ($currentPage + 1) . '">Next &raquo;</a>';
+                            echo '<a href="?page=' . ($currentPage + 1) . $sort_params . '">Next &raquo;</a>';
                         } else {
                             echo '<span class="disabled">Next &raquo;</span>';
                         }
